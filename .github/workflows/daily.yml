@@ -1,0 +1,58 @@
+name: 每日中美热点新闻推送微信
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 0:00 = 北京时间 08:00（可改时间）
+  workflow_dispatch:  # 允许手动触发测试
+
+jobs:
+  fetch-and-send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install feedparser requests
+
+      - name: Run news fetch and send script
+        env:
+          SCKEY: ${{ secrets.SCKEY }}
+        run: python -c "
+import feedparser
+import requests
+import json
+from datetime import datetime
+
+sckey = '${{ secrets.SCKEY }}'
+if not sckey:
+    print('Error: SCKEY not set!')
+    exit(1)
+
+# 中国热点：用今日头条 RSS（Top 3）
+cn_feed = feedparser.parse('https://www.toutiao.com/search_feed/?keyword=%E7%83%AD%E7%82%B9')
+cn_entries = cn_feed.entries[:3] if 'entries' in cn_feed else []
+cn_text = '🇨🇳 中国热点：\\n' + '\\n'.join([f'• {e.title[:50]}... [{e.link}]({e.link})' for e in cn_entries]) if cn_entries else '暂无热点'
+
+# 美国热点：用 Google News US RSS（Top 3）
+us_feed = feedparser.parse('https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en')
+us_entries = us_feed.entries[:3] if 'entries' in us_feed else []
+us_text = '🇺🇸 美国热点：\\n' + '\\n'.join([f'• {e.title[:50]}... [{e.link}]({e.link})' for e in us_entries]) if us_entries else '暂无热点'
+
+# 组装消息
+today = datetime.now().strftime('%Y-%m-%d')
+title = f'📮 每日中美热点速递 {today}'
+desp = f'{cn_text}\\n\\n{us_text}\\n\\n---\\nPowered by GitHub Actions & Grok'
+
+# 发送到 Server酱（微信）
+response = requests.post(f'https://sctapi.ftqq.com/{sckey}.send', data={
+    'title': title,
+    'desp': desp
+})
+print(f'Status: {response.status_code} - {response.text}')
+          "
