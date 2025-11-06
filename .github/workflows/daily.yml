@@ -2,14 +2,14 @@ name: 每日中美热点新闻推送微信
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 北京时间 8:00
-  workflow_dispatch:
+    - cron: '0 0 * * *'  # 北京时间 8:00 自动运行
+  workflow_dispatch:     # 支持手动触发
 
 jobs:
-  fetch-and-send:
+  send-news:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -17,59 +17,48 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install deps
         run: pip install feedparser requests
 
-      - name: Run news script
+      - name: Run script
         env:
           SCKEY: ${{ secrets.SCKEY }}
         run: |
-          python << 'EOF'
+          python << 'PY'
 import feedparser
 import requests
 from datetime import datetime
 
-# 获取密钥
-sckey = '${{ secrets.SCKEY }}'.strip()
-if not sckey or sckey == 'None':
-    print("SCKEY 未设置！请到 Settings > Secrets 添加")
+sckey = "${{ secrets.SCKEY }}".strip()
+if not sckey:
+    print("SCKEY 未设置！")
     exit(1)
 
-# 中国热点
+# 中国热点 - 微博热搜
 try:
-    cn = feedparser.parse('https://rsshub.app/weibo/search/hot')['entries'][:3]
-    cn_lines = []
-    for e in cn:
-        title = e.title.split('[')[0].strip()[:50]
-        cn_lines.append(f"• {title}...\n  {e.link}")
+    cn = feedparser.parse("https://rsshub.app/weibo/search/hot").entries[:3]
+    cn_lines = [f"• {e.title.split('[')[0][:45]}...\n  {e.link}" for e in cn]
     cn_text = "China 中国热点：\n" + "\n".join(cn_lines)
 except:
     cn_text = "China 中国热点：暂无数据"
 
-# 美国热点
+# 美国热点 - Google News
 try:
-    us = feedparser.parse('https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en')['entries'][:3]
-    us_lines = []
-    for e in us:
-        title = e.title.split(' - ')[0][:50]
-        us_lines.append(f"• {title}...\n  {e.link}")
+    us = feedparser.parse("https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en").entries[:3]
+    us_lines = [f"• {e.title.split(' - ')[0][:45]}...\n  {e.link}" for e in us]
     us_text = "USA 美国热点：\n" + "\n".join(us_lines)
 except:
     us_text = "USA 美国热点：暂无数据"
 
-# 组装消息（避免 f-string 嵌套）
-today = datetime.now().strftime('%Y-%m-%d')
-time_now = datetime.now().strftime('%H:%M')
+# 组装消息
+today = datetime.now().strftime("%Y-%m-%d")
+time = datetime.now().strftime("%H:%M")
 title = f"每日热点速递 {today}"
-desp = f"{cn_text}\n\n{us_text}\n\n---\n更新于 {time_now} | GitHub Actions"
+desp = f"{cn_text}\n\n{us_text}\n\n---\n更新于 {time} | GitHub Actions"
 
-# 发送
-url = f"https://sctapi.ftqq.com/{sckey}.send"
-data = {'title': title, 'desp': desp}
-resp = requests.post(url, data=data)
+# 发送到微信
+resp = requests.post(f"https://sctapi.ftqq.com/{sckey}.send", data={"title": title, "desp": desp})
 print(f"推送状态: {resp.status_code}")
 if resp.status_code == 200:
     print("微信推送成功！")
-else:
-    print(f"推送失败: {resp.text}")
-EOF
+PY
