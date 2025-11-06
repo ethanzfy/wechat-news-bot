@@ -2,13 +2,11 @@ name: 每日新闻推送
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天UTC时间0:00（北京时间8:00）
-    # 或者选择其他时间：
-    # - cron: '0 1 * * *'  # 北京时间9:00
-    # - cron: '0 8 * * *'  # 北京时间16:00
+    - cron: '0 9 * * *'  # 每天UTC时间9:00（北京时间17:00）
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  collect-and-send:
+  send-news:
     runs-on: ubuntu-latest
     
     steps:
@@ -21,9 +19,9 @@ jobs:
         python-version: '3.11'
         
     - name: 安装依赖
-      run: pip install requests feedparser pytz
+      run: pip install requests pytz
       
-    - name: 运行新闻收集脚本
+    - name: 运行新闻推送脚本
       env:
         SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
       run: python news_bot.py
