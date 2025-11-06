@@ -24,7 +24,7 @@ jobs:
         env:
           SCKEY: ${{ secrets.SCKEY }}
         run: |
-          python - << 'PY'
+          python << 'EOF'
 import feedparser
 import requests
 from datetime import datetime
@@ -38,17 +38,17 @@ if not sckey:
 try:
     cn = feedparser.parse("https://rsshub.app/weibo/search/hot").entries[:3]
     cn_lines = [f"• {e.title.split('[')[0][:45]}...\n  {e.link}" for e in cn]
-    cn_text = "🇨🇳 中国热点：\n" + "\n".join(cn_lines)
+    cn_text = "China 中国热点：\n" + "\n".join(cn_lines)
 except Exception as e:
-    cn_text = f"🇨🇳 中国热点：加载失败 ({e})"
+    cn_text = f"China 中国热点：加载失败 ({e})"
 
 # 美国热点 - Google News
 try:
     us = feedparser.parse("https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en").entries[:3]
     us_lines = [f"• {e.title.split(' - ')[0][:45]}...\n  {e.link}" for e in us]
-    us_text = "🇺🇸 美国热点：\n" + "\n".join(us_lines)
+    us_text = "USA 美国热点：\n" + "\n".join(us_lines)
 except Exception as e:
-    us_text = f"🇺🇸 美国热点：加载失败 ({e})"
+    us_text = f"USA 美国热点：加载失败 ({e})"
 
 # 组装消息
 today = datetime.now().strftime("%Y-%m-%d")
@@ -56,11 +56,11 @@ time = datetime.now().strftime("%H:%M")
 title = f"每日热点速递 {today}"
 desp = f"{cn_text}\n\n{us_text}\n\n---\n更新于 {time} | GitHub Actions"
 
-# 发送
+# 发送到微信
 resp = requests.post(f"https://sctapi.ftqq.com/{sckey}.send", data={"title": title, "desp": desp})
 print(f"推送状态: {resp.status_code}")
 if resp.status_code == 200:
     print("微信推送成功！")
 else:
     print(f"推送失败: {resp.text}")
-PY
+EOF
