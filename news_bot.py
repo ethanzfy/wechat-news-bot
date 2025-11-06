@@ -1,9 +1,8 @@
 import os
 import requests
-import feedparser
-import time
-import pytz
+import json
 from datetime import datetime
+import pytz
 
 class NewsCollector:
     def __init__(self):
@@ -16,100 +15,181 @@ class NewsCollector:
         beijing_tz = pytz.timezone('Asia/Shanghai')
         return datetime.now(beijing_tz)
     
-    def get_news_with_retry(self, source_name, get_function, retries=2):
-        """带重试的新闻获取"""
-        for i in range(retries):
-            try:
-                result = get_function()
-                if "获取失败" not in result:
-                    return result
-            except Exception as e:
-                pass
-            if i < retries - 1:
-                time.sleep(1)
-        return f"{source_name}: 获取失败，请稍后重试"
-    
     def get_weibo_hot(self):
-        """获取微博热搜"""
+        """获取微博热搜 - 使用官方API"""
         try:
-            feed = feedparser.parse("https://rsshub.app/weibo/search/hot")
-            items = []
-            for i, entry in enumerate(feed.entries[:5], 1):
-                title = entry.title.split('】')[-1] if '】' in entry.title else entry.title
-                items.append(f"{i}. {title[:28]}...")
-            return "🐦 微博热搜:\n" + "\n".join(items)
+            # 方法1：使用第三方API
+            url = "https://api.oioweb.cn/api/common/hotlist"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('result', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "🐦 微博热搜:\n" + "\n".join(items)
+        except:
+            pass
+        
+        # 备用方法
+        try:
+            url = "https://api.vvhan.com/api/hotlist?type=wbHot"
+            response = requests.get(url, timeout=8)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('data', [])[:5], 1):
+                    title = item.get('title', item.get('name', ''))[:25]
+                    items.append(f"{i}. {title}...")
+                return "🐦 微博热搜:\n" + "\n".join(items)
         except Exception as e:
             return f"🐦 微博热搜: 获取失败"
+        
+        return "🐦 微博热搜: 暂时无法获取"
     
     def get_zhihu_hot(self):
-        """获取知乎热榜"""
+        """获取知乎热榜 - 使用稳定API"""
         try:
-            feed = feedparser.parse("https://rsshub.app/zhihu/hotlist")
-            items = []
-            for i, entry in enumerate(feed.entries[:5], 1):
-                items.append(f"{i}. {entry.title[:30]}...")
-            return "📚 知乎热榜:\n" + "\n".join(items)
-        except Exception as e:
+            url = "https://api.oioweb.cn/api/common/hotlist?type=zhihu"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('result', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "📚 知乎热榜:\n" + "\n".join(items)
+        except:
+            pass
+        
+        try:
+            url = "https://api.vvhan.com/api/hotlist?type=zhihu"
+            response = requests.get(url, timeout=8)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('data', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "📚 知乎热榜:\n" + "\n".join(items)
+        except:
             return f"📚 知乎热榜: 获取失败"
+        
+        return "📚 知乎热榜: 暂时无法获取"
     
     def get_bilibili_hot(self):
         """获取B站热榜"""
         try:
-            feed = feedparser.parse("https://rsshub.app/bilibili/ranking/0/3")
-            items = []
-            for i, entry in enumerate(feed.entries[:5], 1):
-                title = entry.title.replace('【【【', '').replace('】】】', '')
-                items.append(f"{i}. {title[:28]}...")
-            return "🎬 B站热榜:\n" + "\n".join(items)
-        except Exception as e:
+            url = "https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=all"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('data', {}).get('list', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "🎬 B站热榜:\n" + "\n".join(items)
+        except:
+            pass
+        
+        try:
+            url = "https://api.vvhan.com/api/hotlist?type=bili"
+            response = requests.get(url, timeout=8)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('data', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "🎬 B站热榜:\n" + "\n".join(items)
+        except:
             return f"🎬 B站热榜: 获取失败"
+        
+        return "🎬 B站热榜: 暂时无法获取"
     
     def get_toutiao_hot(self):
         """获取今日头条热榜"""
         try:
-            feed = feedparser.parse("https://rsshub.app/toutiao/hot")
-            items = []
-            for i, entry in enumerate(feed.entries[:5], 1):
-                items.append(f"{i}. {entry.title[:30]}...")
-            return "📰 今日头条:\n" + "\n".join(items)
-        except Exception as e:
+            url = "https://api.vvhan.com/api/hotlist?type=toutiao"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('data', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "📰 今日头条:\n" + "\n".join(items)
+        except:
             return f"📰 今日头条: 获取失败"
+        
+        return "📰 今日头条: 暂时无法获取"
     
     def get_cctv_news(self):
         """获取央视新闻"""
         try:
-            feed = feedparser.parse("https://rsshub.app/cctv/news")
-            items = []
-            for i, entry in enumerate(feed.entries[:5], 1):
-                items.append(f"{i}. {entry.title[:30]}...")
-            return "📺 央视新闻:\n" + "\n".join(items)
-        except Exception as e:
+            # 使用人民日报作为央视新闻的替代
+            url = "https://api.vvhan.com/api/hotlist?type=people"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('data', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "📺 央视新闻:\n" + "\n".join(items)
+        except:
+            pass
+        
+        try:
+            # 备用源：新华网
+            url = "https://api.oioweb.cn/api/common/hotlist?type=xinhua"
+            response = requests.get(url, timeout=8)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('result', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "📺 央视新闻:\n" + "\n".join(items)
+        except:
             return f"📺 央视新闻: 获取失败"
+        
+        return "📺 央视新闻: 暂时无法获取"
     
     def get_usa_news(self):
         """获取美国热点新闻"""
         try:
-            feed = feedparser.parse("https://rsshub.app/reuters/world/us")
-            items = []
-            for i, entry in enumerate(feed.entries[:5], 1):
-                items.append(f"{i}. {entry.title[:30]}...")
-            return "🇺🇸 美国热点:\n" + "\n".join(items)
-        except Exception as e:
-            return f"🇺🇸 美国热点: 获取失败"
-    
-    def format_news_content(self, news_sections):
-        """优化消息格式"""
-        current_time = self.get_beijing_time()
-        content = f"# 📰 每日热点新闻 {current_time.strftime('%Y-%m-%d')}\n\n"
+            # 使用国际新闻作为美国热点
+            url = "https://api.vvhan.com/api/hotlist?type=guoji"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('data', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "🇺🇸 国际热点:\n" + "\n".join(items)
+        except:
+            pass
         
-        for section in news_sections:
-            content += f"## {section}\n\n"
+        try:
+            # 备用源：BBC新闻
+            url = "https://api.oioweb.cn/api/common/hotlist?type=bbc"
+            response = requests.get(url, timeout=8)
+            if response.status_code == 200:
+                data = response.json()
+                items = []
+                for i, item in enumerate(data.get('result', [])[:5], 1):
+                    title = item.get('title', '')[:25]
+                    items.append(f"{i}. {title}...")
+                return "🇺🇸 国际热点:\n" + "\n".join(items)
+        except:
+            return f"🇺🇸 国际热点: 获取失败"
         
-        content += "---\n"
-        content += f"🕐 更新时间: {current_time.strftime('%Y-%m-%d %H:%M')} (北京时间)\n"
-        content += "🤖 由 GitHub Actions 自动推送\n"
-        
-        return content
+        return "🇺🇸 国际热点: 暂时无法获取"
     
     def send_to_wechat(self, content):
         """发送到微信"""
@@ -139,24 +219,26 @@ class NewsCollector:
         """主运行函数"""
         print("开始收集新闻...")
         
-        # 收集各平台新闻（带重试）
-        news_functions = [
-            ("微博热搜", self.get_weibo_hot),
-            ("知乎热榜", self.get_zhihu_hot),
-            ("B站热榜", self.get_bilibili_hot),
-            ("今日头条", self.get_toutiao_hot),
-            ("央视新闻", self.get_cctv_news),
-            ("美国热点", self.get_usa_news)
+        # 收集各平台新闻
+        news_sections = [
+            self.get_weibo_hot(),
+            self.get_zhihu_hot(),
+            self.get_bilibili_hot(),
+            self.get_toutiao_hot(),
+            self.get_cctv_news(),
+            self.get_usa_news()
         ]
         
-        news_sections = []
-        for name, func in news_functions:
-            section = self.get_news_with_retry(name, func)
-            news_sections.append(section)
-            time.sleep(0.5)  # 避免请求过快
-        
         # 组合内容
-        content = self.format_news_content(news_sections)
+        current_time = self.get_beijing_time()
+        content = f"# 📰 每日热点新闻 {current_time.strftime('%Y-%m-%d')}\n\n"
+        
+        for section in news_sections:
+            content += f"## {section}\n\n"
+        
+        content += "---\n"
+        content += f"🕐 更新时间: {current_time.strftime('%Y-%m-%d %H:%M')} (北京时间)\n"
+        content += "🤖 由 GitHub Actions 自动推送\n"
         
         print("开始推送微信...")
         success = self.send_to_wechat(content)
