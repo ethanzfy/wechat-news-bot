@@ -2,8 +2,8 @@ name: 每日中美热点新闻推送微信
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 0:00 = 北京时间 08:00（可改时间）
-  workflow_dispatch:  # 允许手动触发测试
+    - cron: '0 0 * * *'  # 北京时间 8:00 自动运行
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   fetch-and-send:
@@ -23,36 +23,46 @@ jobs:
       - name: Run news fetch and send script
         env:
           SCKEY: ${{ secrets.SCKEY }}
-        run: python -c "
-import feedparser
-import requests
-import json
-from datetime import datetime
+        run: |
+          python -c "
+          import feedparser
+          import requests
+          from datetime import datetime
 
-sckey = '${{ secrets.SCKEY }}'
-if not sckey:
-    print('Error: SCKEY not set!')
-    exit(1)
+          sckey = '$SCKEY'
+          if not sckey or sckey == 'None':
+              print('Error: SCKEY not set! 请检查 Settings > Secrets')
+              exit(1)
 
-# 中国热点：用今日头条 RSS（Top 3）
-cn_feed = feedparser.parse('https://www.toutiao.com/search_feed/?keyword=%E7%83%AD%E7%82%B9')
-cn_entries = cn_feed.entries[:3] if 'entries' in cn_feed else []
-cn_text = '🇨🇳 中国热点：\\n' + '\\n'.join([f'• {e.title[:50]}... [{e.link}]({e.link})' for e in cn_entries]) if cn_entries else '暂无热点'
+          # 中国热点：百度新闻 RSS (Top 3)
+          try:
+              cn_feed = feedparser.parse('https://feedx.net/rss/baidu.xml')
+              cn_entries = cn_feed.entries[:3] if 'entries' in cn_feed else []
+              cn_text = '🇨🇳 中国热点：\n' + '\n'.join([f'• {e.title[:50]}... \n  {e.link}' for e in cn_entries]) if cn_entries else '暂无热点'
+          except Exception as e:
+              cn_text = f'🇨🇳 中国热点：加载失败 ({e})'
 
-# 美国热点：用 Google News US RSS（Top 3）
-us_feed = feedparser.parse('https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en')
-us_entries = us_feed.entries[:3] if 'entries' in us_feed else []
-us_text = '🇺🇸 美国热点：\\n' + '\\n'.join([f'• {e.title[:50]}... [{e.link}]({e.link})' for e in us_entries]) if us_entries else '暂无热点'
+          # 美国热点：Google News RSS (Top 3)
+          try:
+              us_feed = feedparser.parse('https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en')
+              us_entries = us_feed.entries[:3] if 'entries' in us_feed else []
+              us_text = '🇺🇸 美国热点：\n' + '\n'.join([f'• {e.title[:50]}... \n  {e.link}' for e in us_entries]) if us_entries else '暂无热点'
+          except Exception as e:
+              us_text = f'🇺🇸 美国热点：加载失败 ({e})'
 
-# 组装消息
-today = datetime.now().strftime('%Y-%m-%d')
-title = f'📮 每日中美热点速递 {today}'
-desp = f'{cn_text}\\n\\n{us_text}\\n\\n---\\nPowered by GitHub Actions & Grok'
+          # 组装消息
+          today = datetime.now().strftime('%Y-%m-%d')
+          title = f'📮 每日中美热点速递 {today}'
+          desp = f'{cn_text}\n\n{us_text}\n\n---\n🕐 更新于 {datetime.now().strftime("%H:%M")} | Powered by GitHub Actions'
 
-# 发送到 Server酱（微信）
-response = requests.post(f'https://sctapi.ftqq.com/{sckey}.send', data={
-    'title': title,
-    'desp': desp
-})
-print(f'Status: {response.status_code} - {response.text}')
+          # 发送到 Server酱（微信）
+          response = requests.post(f'https://sctapi.ftqq.com/{sckey}.send', data={
+              'title': title,
+              'desp': desp
+          })
+          print(f'推送状态: {response.status_code}')
+          if response.status_code == 200:
+              print('✅ 微信推送成功！')
+          else:
+              print(f'❌ 推送失败: {response.text}')
           "
